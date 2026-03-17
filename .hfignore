@@ -1,0 +1,8 @@
+node_modules/
+.git/
+.env
+.github/
+.claude/
+runs/
+tests/
+__tests__/

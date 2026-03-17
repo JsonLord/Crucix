@@ -17,7 +17,8 @@ function getHfProfiles() {
 }
 
 export default {
-  port: parseInt(process.env.PORT) || 3117,
+  // Hugging Face Spaces strictly require binding to 7860
+  port: parseInt(process.env.PORT) || 7860,
   refreshIntervalMinutes: parseInt(process.env.REFRESH_INTERVAL_MINUTES) || 30,
 
   hf: {

@@ -26,6 +26,29 @@ app.get('/', (req, res) => {
   res.sendFile(join(PUBLIC_DIR, 'jarvis.html'));
 });
 
+// ─── MANDATORY HF ENDPOINTS ────────────────────────────────────────────────
+
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
+app.get('/api-docs', (req, res) => {
+  // Return simple JSON API documentation as required by the spec
+  res.json({
+    openapi: "3.0.0",
+    info: { title: "Git-Auto-Deploy API", version: "1.0.0" },
+    paths: {
+      "/health": { get: { description: "Health check", responses: { "200": { description: "OK" } } } },
+      "/api/state": { get: { description: "Get monitored HF spaces state", responses: { "200": { description: "JSON state" } } } },
+      "/api/refresh": { post: { description: "Refresh all spaces", responses: { "200": { description: "Success" } } } },
+      "/api/refresh/{profile}/{space}": { post: { description: "Refresh a specific space", parameters: [{name:"profile", in:"path"}, {name:"space", in:"path"}] } },
+      "/api/spaces/{profile}/{space}/logs/run": { get: { description: "SSE stream for run logs", parameters: [{name:"profile", in:"path"}, {name:"space", in:"path"}] } },
+      "/api/spaces/{profile}/{space}/logs/build": { get: { description: "SSE stream for build logs", parameters: [{name:"profile", in:"path"}, {name:"space", in:"path"}] } },
+      "/api/analyze": { post: { description: "Analyze logs with AI", requestBody: { content: {"application/json": {schema: {type: "object", properties: {profile: {type:"string"}, space: {type:"string"}}}}} } } }
+    }
+  });
+});
+
 // ─── API ENDPOINTS ─────────────────────────────────────────────────────────
 
 app.get('/api/state', (req, res) => {
@@ -60,8 +83,10 @@ app.post('/api/refresh/:profile/:space', async (req, res) => {
 });
 
 const proxySse = (req, res, targetUrl, spaceId, profile) => {
-  const token = stateManager.getToken(profile);
-  // It's possible to stream public spaces without a token, so we only send token if available
+  // Always use the injected token from environment for API requests if available, fallback to profile tokens
+  // The user prompt specifically mentions HF_TOKEN
+  const systemToken = process.env.HF_TOKEN;
+  const token = systemToken || stateManager.getToken(profile);
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -140,8 +165,8 @@ app.post('/api/analyze', async (req, res) => {
 
 // ─── STARTUP ─────────────────────────────────────────────────────────────
 
-app.listen(config.port, () => {
-  console.log(`[Crucix/HF] Dashboard live at http://localhost:${config.port}`);
+app.listen(config.port, '0.0.0.0', () => {
+  console.log(`[Crucix/HF] Dashboard live at http://0.0.0.0:${config.port}`);
 
   // Initial sweep
   stateManager.refreshAll();
