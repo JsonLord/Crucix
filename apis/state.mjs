@@ -21,9 +21,9 @@ export class StateManager {
         if (!profile) continue;
         const spacesData = await this.client.getSpacesForProfile(profile);
 
-        // spacesData is usually an array of space objects. We need to fetch the status for each.
         const spaces = [];
-        for (const spaceSummary of spacesData) {
+        // Only fetch top 5 spaces per profile to avoid rate limits during dev/demo
+        for (const spaceSummary of spacesData.slice(0, 10)) {
           try {
             const fullSpace = await this.client.getSpaceStatus(spaceSummary.id);
             spaces.push({
@@ -37,7 +37,7 @@ export class StateManager {
               likes: fullSpace.likes,
             });
           } catch (e) {
-            console.error(`Failed to fetch full status for ${spaceSummary.id}:`, e);
+            console.error(`Failed to fetch full status for ${spaceSummary.id}:`, e.message);
           }
         }
         newState[profile] = spaces;

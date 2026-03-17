@@ -15,7 +15,6 @@ export class HuggingFaceClient {
   }
 
   async getSpacesForProfile(profile) {
-    // Basic search API: api/models or api/spaces, we use /api/spaces?author=${profile}
     const response = await fetch(`${this.baseUrl}/spaces?author=${encodeURIComponent(profile)}`, {
       headers: this.headers,
     });
