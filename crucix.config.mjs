@@ -2,13 +2,26 @@
 
 import './apis/utils/env.mjs'; // Load .env first
 
+// Parse multiple HF_PROFILE_X and HF_TOKEN_X pairs
+function getHfProfiles() {
+  const profiles = [];
+  // Support up to a reasonable number of profiles, e.g., 20
+  for (let i = 1; i <= 20; i++) {
+    const profileName = process.env[`HF_PROFILE_${i}`]?.trim();
+    const token = process.env[`HF_TOKEN_${i}`]?.trim() || null;
+    if (profileName) {
+      profiles.push({ name: profileName, token: token, id: `profile_${i}` });
+    }
+  }
+  return profiles;
+}
+
 export default {
   port: parseInt(process.env.PORT) || 3117,
   refreshIntervalMinutes: parseInt(process.env.REFRESH_INTERVAL_MINUTES) || 30,
 
   hf: {
-    token: process.env.HF_TOKEN || null,
-    profiles: process.env.HF_PROFILES ? process.env.HF_PROFILES.split(',').map(s => s.trim()) : [],
+    profiles: getHfProfiles(), // Array of { name: 'huggingface', token: '...', id: 'profile_1' }
   },
 
   llm: {

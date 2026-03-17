@@ -65,6 +65,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 .item.sleeping .item-src{color:#64748b}
 .item.error .item-src{color:#ef4444}
 
+/* TABS */
+.profile-tab { padding:6px 12px; background:var(--glass); border:1px solid var(--border); border-radius:4px; font-family:var(--mono); font-size:11px; cursor:pointer; white-space:nowrap; transition:all 0.2s; color:var(--dim); }
+.profile-tab.active { background:rgba(100,240,200,0.1); border-color:var(--accent); color:var(--accent); }
+.profile-tab:hover { border-color:var(--accent); }
+
 /* CONTROLS */
 .btn-row{display:flex;gap:8px;margin-top:10px}
 .btn{background:rgba(100,240,200,0.1);color:var(--accent);border:1px solid var(--border);padding:4px 8px;border-radius:4px;font-family:var(--mono);font-size:10px;cursor:pointer;transition:all 0.2s}
@@ -97,6 +102,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
         <div class="wg-title">HUGGING FACE SPACES</div>
         <div class="wg-count" id="spacesCount">0 TOTAL</div>
       </div>
+      <div id="profileTabs" style="display:flex; gap:8px; margin-bottom:16px; overflow-x:auto;"></div>
       <div id="spacesList"></div>
     </div>
     <div class="col" id="centerCol">
@@ -115,7 +121,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 const bootLines = [
   "Initializing Hugging Face Monitor...",
   "Loading authentication tokens...",
-  "[OK] Token verified.",
+  "[OK] Tokens verified.",
   "Fetching configuration...",
   "Connecting to HF API...",
   "[OK] API connection established."
@@ -156,17 +162,46 @@ function initApp(){
 // === APP LOGIC ===
 let state = null;
 let activeStream = null;
+let currentProfile = null;
 
 async function fetchState() {
   try {
     const res = await fetch('/api/state');
     const data = await res.json();
     state = data;
+
+    // Auto-select first profile if none selected
+    if (!currentProfile && state.profiles && state.profiles.length > 0) {
+      currentProfile = state.profiles[0];
+    }
+
     renderTopbar();
+    renderProfileTabs();
     renderSpaces();
   } catch (e) {
     console.error('Failed to fetch state', e);
   }
+}
+
+function switchProfile(profileName) {
+  currentProfile = profileName;
+  renderProfileTabs();
+  renderSpaces();
+}
+
+function renderProfileTabs() {
+  const tabsContainer = document.getElementById('profileTabs');
+  tabsContainer.innerHTML = '';
+
+  if (!state.profiles) return;
+
+  state.profiles.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = `profile-tab ${p === currentProfile ? 'active' : ''}`;
+    btn.innerText = p.toUpperCase();
+    btn.onclick = () => switchProfile(p);
+    tabsContainer.appendChild(btn);
+  });
 }
 
 function renderTopbar(){
@@ -186,39 +221,41 @@ function renderTopbar(){
       <div class="tb-stat">TIME <span class="tb-val">${t}</span></div>
     </div>
     <div class="tb-left">
+      <div class="tb-stat">PROFILES <span class="tb-val">${state.profiles ? state.profiles.length : 0}</span></div>
       <div class="tb-stat">SPACES <span class="tb-val">${totalSpaces}</span></div>
       <div class="tb-stat">STATUS <span class="tb-val" style="color:#10b981">ONLINE</span></div>
     </div>
   `;
-  document.getElementById('spacesCount').innerText = `${totalSpaces} TOTAL`;
 }
 
 function renderSpaces(){
   const list = document.getElementById('spacesList');
   list.innerHTML = '';
-  if(!state.spaces) return;
+  if(!state.spaces || !currentProfile) return;
 
-  for(const profile in state.spaces) {
-    state.spaces[profile].forEach(space => {
-      const div = document.createElement('div');
-      const statusClass = (space.status || 'unknown').toLowerCase().replace(' ','-');
-      div.className = `item ${statusClass}`;
-      div.innerHTML = `
-        <div class="item-meta">
-          <span class="item-src">Hugging Face Space: ${space.name}</span>
-          <span>${space.hardware.toUpperCase()}</span>
-        </div>
-        <div style="font-size:11px;color:var(--text);margin-bottom:8px;">PROFILE: ${profile.toUpperCase()}</div>
-        <div style="font-size:11px;color:var(--text)">STATUS: <span style="font-weight:bold">${space.status.toUpperCase()}</span></div>
-        <div class="btn-row">
-          <button class="btn" onclick="startLogs('${profile}','${space.name}','run')">RUN LOGS</button>
-          <button class="btn" onclick="startLogs('${profile}','${space.name}','build')">BUILD LOGS</button>
-          <button class="btn btn-ai" onclick="analyzeLogs('${profile}','${space.name}')">AI ANALYZE</button>
-        </div>
-      `;
-      list.appendChild(div);
-    });
-  }
+  const spaces = state.spaces[currentProfile] || [];
+
+  document.getElementById('spacesCount').innerText = `${spaces.length} IN PROFILE`;
+
+  spaces.forEach(space => {
+    const div = document.createElement('div');
+    const statusClass = (space.status || 'unknown').toLowerCase().replace(' ','-');
+    div.className = `item ${statusClass}`;
+    div.innerHTML = `
+      <div class="item-meta">
+        <span class="item-src">${space.name}</span>
+        <span>${space.hardware.toUpperCase()}</span>
+      </div>
+      <div style="font-size:11px;color:var(--text);margin-bottom:8px;">PROFILE: ${currentProfile.toUpperCase()}</div>
+      <div style="font-size:11px;color:var(--text)">STATUS: <span style="font-weight:bold">${space.status.toUpperCase()}</span></div>
+      <div class="btn-row">
+        <button class="btn" onclick="startLogs('${currentProfile}','${space.name}','run')">RUN LOGS</button>
+        <button class="btn" onclick="startLogs('${currentProfile}','${space.name}','build')">BUILD LOGS</button>
+        <button class="btn btn-ai" onclick="analyzeLogs('${currentProfile}','${space.name}')">AI ANALYZE</button>
+      </div>
+    `;
+    list.appendChild(div);
+  });
 }
 
 function startLogs(profile, space, type) {
@@ -226,7 +263,8 @@ function startLogs(profile, space, type) {
 
   const container = document.getElementById('logsContainer');
   document.getElementById('centerTitle').innerText = `${profile}/${space} - ${type.toUpperCase()} LOGS`;
-  container.innerHTML = `[CONNECTING TO SSE] ${profile}/${space} ${type}...\n`;
+  container.innerHTML = `[CONNECTING TO SSE] ${profile}/${space} ${type}...
+`;
 
   activeStream = new EventSource(`/api/spaces/${profile}/${space}/logs/${type}`);
 

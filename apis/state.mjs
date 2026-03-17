@@ -3,10 +3,31 @@ import { HuggingFaceClient } from './hf-client.mjs';
 export class StateManager {
   constructor(config) {
     this.config = config;
-    this.client = new HuggingFaceClient(config.hf.token);
-    this.state = {}; // map of profile_id -> [spaces]
+    this.clients = {}; // profileName -> HuggingFaceClient
+    this.state = {};   // profileName -> [spaces]
     this.lastRefreshed = null;
     this.isRefreshing = false;
+
+    // Initialize clients for configured profiles
+    if (this.config.hf && Array.isArray(this.config.hf.profiles)) {
+      for (const p of this.config.hf.profiles) {
+        if (p.name) {
+          this.clients[p.name] = new HuggingFaceClient(p.token);
+          this.state[p.name] = []; // Initialize empty array for profile
+        }
+      }
+    }
+  }
+
+  // Get a client for a specific profile name
+  getClient(profileName) {
+    return this.clients[profileName];
+  }
+
+  // Get the token configured for a specific profile name
+  getToken(profileName) {
+    const p = this.config.hf.profiles.find(x => x.name === profileName);
+    return p ? p.token : null;
   }
 
   async refreshAll() {
@@ -15,32 +36,37 @@ export class StateManager {
 
     try {
       const newState = {};
-      const profiles = this.config.hf.profiles;
+      const profiles = Object.keys(this.clients);
 
-      for (const profile of profiles) {
-        if (!profile) continue;
-        const spacesData = await this.client.getSpacesForProfile(profile);
+      for (const profileName of profiles) {
+        const client = this.clients[profileName];
+        try {
+          const spacesData = await client.getSpacesForProfile(profileName);
 
-        const spaces = [];
-        // Only fetch top 5 spaces per profile to avoid rate limits during dev/demo
-        for (const spaceSummary of spacesData.slice(0, 10)) {
-          try {
-            const fullSpace = await this.client.getSpaceStatus(spaceSummary.id);
-            spaces.push({
-              id: fullSpace.id,
-              name: fullSpace.id.split('/')[1],
-              profile: profile,
-              status: fullSpace.runtime?.stage || 'UNKNOWN', // running, paused, sleeping
-              hardware: fullSpace.runtime?.hardware || 'cpu',
-              lastModified: fullSpace.lastModified,
-              author: fullSpace.author,
-              likes: fullSpace.likes,
-            });
-          } catch (e) {
-            console.error(`Failed to fetch full status for ${spaceSummary.id}:`, e.message);
+          const spaces = [];
+          // Fetch up to 10 for dev/demo to avoid rate limit
+          for (const spaceSummary of spacesData.slice(0, 10)) {
+            try {
+              const fullSpace = await client.getSpaceStatus(spaceSummary.id);
+              spaces.push({
+                id: fullSpace.id,
+                name: fullSpace.id.split('/')[1],
+                profile: profileName,
+                status: fullSpace.runtime?.stage || 'UNKNOWN', // running, paused, sleeping
+                hardware: fullSpace.runtime?.hardware || 'cpu',
+                lastModified: fullSpace.lastModified,
+                author: fullSpace.author,
+                likes: fullSpace.likes,
+              });
+            } catch (e) {
+              console.error(`Failed to fetch full status for ${spaceSummary.id}:`, e.message);
+            }
           }
+          newState[profileName] = spaces;
+        } catch (e) {
+           console.error(`Failed to fetch spaces for profile ${profileName}:`, e.message);
+           newState[profileName] = [];
         }
-        newState[profile] = spaces;
       }
 
       this.state = newState;
@@ -59,6 +85,7 @@ export class StateManager {
       lastRefreshed: this.lastRefreshed,
       isRefreshing: this.isRefreshing,
       spaces: this.state,
+      profiles: this.config.hf.profiles.map(p => p.name) // Return list of profile names
     };
   }
 }

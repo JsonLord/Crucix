@@ -41,7 +41,11 @@ app.post('/api/refresh/:profile/:space', async (req, res) => {
   const { profile, space } = req.params;
   const spaceId = `${profile}/${space}`;
   try {
-    const data = await stateManager.client.getSpaceStatus(spaceId);
+    const client = stateManager.getClient(profile);
+    if (!client) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+    const data = await client.getSpaceStatus(spaceId);
     if (stateManager.state[profile]) {
       const idx = stateManager.state[profile].findIndex(s => s.id === spaceId);
       if (idx !== -1) {
@@ -55,17 +59,19 @@ app.post('/api/refresh/:profile/:space', async (req, res) => {
   }
 });
 
-const proxySse = (req, res, targetUrl, spaceId) => {
-  const token = config.hf.token;
-  if (!token) {
-    return res.status(500).send('HF_TOKEN not configured');
-  }
+const proxySse = (req, res, targetUrl, spaceId, profile) => {
+  const token = stateManager.getToken(profile);
+  // It's possible to stream public spaces without a token, so we only send token if available
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
-  const headers = { 'Authorization': `Bearer ${token}` };
+  const headers = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   if (!logBuffers[spaceId]) logBuffers[spaceId] = [];
 
   fetch(targetUrl, { headers })
@@ -101,14 +107,14 @@ app.get('/api/spaces/:profile/:space/logs/run', (req, res) => {
   const { profile, space } = req.params;
   const spaceId = `${profile}/${space}`;
   const url = `https://huggingface.co/api/spaces/${profile}/${space}/logs/run`;
-  proxySse(req, res, url, spaceId);
+  proxySse(req, res, url, spaceId, profile);
 });
 
 app.get('/api/spaces/:profile/:space/logs/build', (req, res) => {
   const { profile, space } = req.params;
   const spaceId = `${profile}/${space}`;
   const url = `https://huggingface.co/api/spaces/${profile}/${space}/logs/build`;
-  proxySse(req, res, url, spaceId);
+  proxySse(req, res, url, spaceId, profile);
 });
 
 app.post('/api/analyze', async (req, res) => {
@@ -117,7 +123,10 @@ app.post('/api/analyze', async (req, res) => {
 
   let readme = '';
   try {
-     readme = await stateManager.client.getSpaceReadme(spaceId);
+     const client = stateManager.getClient(profile);
+     if(client) {
+       readme = await client.getSpaceReadme(spaceId);
+     }
   } catch (e) {}
 
   const recentLogs = logBuffers[spaceId] || [];
