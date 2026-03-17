@@ -18,7 +18,7 @@ app.use(express.static(PUBLIC_DIR));
 app.use(express.json());
 
 const stateManager = new StateManager(config);
-const LOG_BUFFER_SIZE = 500;
+const LOG_BUFFER_SIZE = 100;
 const logBuffers = {}; // { spaceId: [line1, line2...] }
 
 // Serve jarvis.html at root

@@ -45,7 +45,7 @@ export class StateManager {
 
           const spaces = [];
           // Fetch up to 10 for dev/demo to avoid rate limit
-          for (const spaceSummary of spacesData.slice(0, 10)) {
+          for (const spaceSummary of spacesData.slice(0, 5)) {
             try {
               const fullSpace = await client.getSpaceStatus(spaceSummary.id);
               spaces.push({
