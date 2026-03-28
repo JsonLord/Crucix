@@ -1,10 +1,29 @@
-// Crucix Configuration — all settings with env var overrides
+// Hugging Face Space Monitor Configuration — all settings with env var overrides
 
 import './apis/utils/env.mjs'; // Load .env first
 
+// Parse multiple HF_PROFILE_X and HF_TOKEN_X pairs
+function getHfProfiles() {
+  const profiles = [];
+  // Support up to a reasonable number of profiles, e.g., 20
+  for (let i = 1; i <= 20; i++) {
+    const profileName = process.env[`HF_PROFILE_${i}`]?.trim();
+    const token = process.env[`HF_TOKEN_${i}`]?.trim() || null;
+    if (profileName) {
+      profiles.push({ name: profileName, token: token, id: `profile_${i}` });
+    }
+  }
+  return profiles;
+}
+
 export default {
-  port: parseInt(process.env.PORT) || 3117,
-  refreshIntervalMinutes: parseInt(process.env.REFRESH_INTERVAL_MINUTES) || 15,
+  // Hugging Face Spaces strictly require binding to 7860
+  port: parseInt(process.env.PORT) || 7860,
+  refreshIntervalMinutes: parseInt(process.env.REFRESH_INTERVAL_MINUTES) || 30,
+
+  hf: {
+    profiles: getHfProfiles(), // Array of { name: 'huggingface', token: '...', id: 'profile_1' }
+  },
 
   llm: {
     provider: process.env.LLM_PROVIDER || null, // anthropic | openai | gemini | codex
@@ -24,21 +43,5 @@ export default {
     channelId: process.env.DISCORD_CHANNEL_ID || null,
     guildId: process.env.DISCORD_GUILD_ID || null,   // Server ID (for instant slash command registration)
     webhookUrl: process.env.DISCORD_WEBHOOK_URL || null, // Fallback: webhook-only alerts (no bot needed)
-  },
-
-  // Delta engine thresholds — override defaults from lib/delta/engine.mjs
-  // Set to null to use built-in defaults
-  delta: {
-    thresholds: {
-      numeric: {
-        // Example overrides (uncomment to customize):
-        // vix: 3,       // more sensitive to VIX moves
-        // wti: 5,       // less sensitive to oil moves
-      },
-      count: {
-        // urgent_posts: 3,     // need ±3 urgent posts to flag
-        // thermal_total: 1000, // need ±1000 thermal detections
-      },
-    },
   },
 };

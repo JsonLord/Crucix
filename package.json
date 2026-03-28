@@ -14,7 +14,12 @@
     "clean": "node scripts/clean.mjs",
     "fresh-start": "npm run clean && npm start"
   },
-  "keywords": ["osint", "intelligence", "dashboard", "geopolitical"],
+  "keywords": [
+    "osint",
+    "intelligence",
+    "dashboard",
+    "geopolitical"
+  ],
   "author": "Crucix",
   "license": "AGPL-3.0-only",
   "engines": {
@@ -22,7 +27,8 @@
     "npm": ">=10"
   },
   "dependencies": {
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "node-fetch": "^3.3.2"
   },
   "optionalDependencies": {
     "discord.js": "^14.25.0"
